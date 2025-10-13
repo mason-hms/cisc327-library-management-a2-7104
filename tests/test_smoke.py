@@ -14,7 +14,8 @@ from library_service import (
     search_books_in_catalog,
     get_patron_status_report
 )
-from database import init_database, get_db_connection, get_book_by_id
+from database import init_database, get_db_connection, get_book_by_id, get_patron_borrow_count, get_all_books, \
+    get_book_by_isbn
 
 
 # Reset a clean database
@@ -103,6 +104,42 @@ def test_borrow_book_does_not_exist():
     success, message = borrow_book_by_patron("123456", 999)
     assert success == False
     assert "book not found" in message.lower()
+
+
+def test_borrow_limit_bug():
+    """Test that patron cannot borrow more than 5 books"""
+    # Clean test patron's borrow records
+    conn = get_db_connection()
+    conn.execute('DELETE FROM borrow_records WHERE patron_id = "111222"')
+    conn.commit()
+    conn.close()
+
+    # Add 6 new books and track their IDs
+    new_book_ids = []
+    for i in range(6):
+        add_book_to_catalog(
+            f"Test Book {i}",
+            "Test Author",
+            f"978{str(i).zfill(10)}",  # Better ISBN format
+            1
+        )
+        # Get the ID of the book we just added
+        book = get_book_by_isbn(f"978{str(i).zfill(10)}")
+        new_book_ids.append(book['id'])
+
+    # Borrow first 5 books, verify each succeeds
+    for i in range(5):
+        ok, msg = borrow_book_by_patron("111222", new_book_ids[i])
+        assert ok is True, f"Failed to borrow book {new_book_ids[i]}: {msg}"
+
+    # Verify patron has exactly 5 books
+    count = get_patron_borrow_count("111222")
+    assert count == 5, f"Expected 5 borrowed books, got {count}"
+
+    # Try to borrow 6th book, should fail due to limit
+    ok, msg = borrow_book_by_patron("111222", new_book_ids[5])
+    assert ok is False, "Should not allow borrowing 6th book"
+    assert "limit" in msg.lower(), f"Error message should mention limit: {msg}"
 
 # Update: All the function are implemented
 # --- Tests for return_book_by_patron (R4) ---
