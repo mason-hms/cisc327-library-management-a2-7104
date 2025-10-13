@@ -35,11 +35,15 @@ def add_book_to_catalog(title: str, author: str, isbn: str, total_copies: int) -
     if not author or not author.strip():
         return False, "Author is required."
 
+    if not isinstance(isbn, str):
+        isbn = str(isbn)
+    isbn = isbn.strip()
+
     if len(author.strip()) > 100:
         return False, "Author must be less than 100 characters."
 
-    if len(isbn) != 13:
-        return False, "ISBN must be exactly 13 digits."
+    if len(isbn) != 13 or not isbn.isdigit():
+        return False, "ISBN must be exactly 13 digits (numbers only)."
 
     if not isinstance(total_copies, int) or total_copies <= 0:
         return False, "Total copies must be a positive integer."
